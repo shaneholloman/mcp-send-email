@@ -31,7 +31,11 @@ export function resolveConfig(
     env.RESEND_API_KEY ??
     null;
 
-  if (!apiKey || !apiKey.trim()) {
+  const http = parsed.http === true;
+
+  // Stdio requires an API key at startup. HTTP mode is lenient because
+  // each client provides their own key via the Authorization: Bearer header.
+  if (!http && (!apiKey || !apiKey.trim())) {
     return {
       ok: false,
       error:
@@ -45,18 +49,18 @@ export function resolveConfig(
       ? env.SENDER_EMAIL_ADDRESS.trim() || undefined
       : undefined);
 
-  const http = parsed.http === true || parsed['http'] === true;
-  const transport = http ? 'http' : 'stdio';
   const port = parsePort(parsed, env);
+
+  const base = {
+    senderEmailAddress: senderEmailAddress ?? '',
+    replierEmailAddresses: parseReplierAddresses(parsed, env),
+    port,
+  };
 
   return {
     ok: true,
-    config: {
-      apiKey: apiKey.trim(),
-      senderEmailAddress: senderEmailAddress ?? '',
-      replierEmailAddresses: parseReplierAddresses(parsed, env),
-      transport,
-      port,
-    },
+    config: http
+      ? { ...base, transport: 'http' as const, apiKey: apiKey?.trim() }
+      : { ...base, transport: 'stdio' as const, apiKey: apiKey!.trim() },
   };
 }
